@@ -11,14 +11,14 @@ import matplotlib.animation as animation
 from datetime import datetime
 
 # CONFIG
-GYRO_PORT = "COM"
+GYRO_PORT = "COM5"
 GYRO_RATE = 57600
 MAST_PORT = "COM7"
 MAST_RATE = 57600
 DATA_DIR = "./data"
 
 ECHO_THRESHOLD = 1000
-CHART_DATAPOINTS = 500
+CHART_DATAPOINTS = 50
 
 STATUS = "RUN"
 
@@ -40,38 +40,46 @@ fh.setFormatter(formatter)
 ch.setFormatter(formatter)
 logger.addHandler(fh)
 logger.addHandler(ch)
+logger.setLevel(logging.INFO)
 
 fig = plt.figure()
 axes = fig.subplots(3, 2)
+plt.subplots_adjust(hspace=0.5)
+axes[0,0].title.set_text("Elevator raw")
+axes[0,0].set_ylim(0, 100)
+axes[0,1].title.set_text("Load factor (g)")
+axes[0,1].set_ylim(-20, 20)
+axes[1,0].title.set_text("Pitch rate (deg/s)")
+axes[1,0].set_ylim(-2, 4)
+axes[1,1].title.set_text("Alpha raw")
+axes[1,1].set_ylim(0, 1024)
+axes[2,0].title.set_text("Beta raw")
+axes[2,0].set_ylim(0, 1024)
+axes[2,1].title.set_text("IAS (km/h)")
+axes[2,1].set_ylim(0, 100)
 
 def animate(_):
     global DATA
     
-    # axes.clear()
     gyro_data = np.array(DATA[GYRO_PORT])
     mast_data = np.array(DATA[MAST_PORT])
-    if gyro_data.size == 0:
-        gyro_data = np.empty((1,4))
-    if mast_data.size == 0:
-        mast_data = np.empty((1,3))
      
-    # Pad data for concatination
-    gyro_data = np.hstack((gyro_data, np.zeros((gyro_data.shape[0], 2))))
-    mast_data = np.hstack((mast_data[:, [0]], np.zeros((mast_data.shape[0], 3)), mast_data[:,1:]))
+    gyro_data = gyro_data[-CHART_DATAPOINTS:]
+    mast_data = mast_data[-CHART_DATAPOINTS:]
     
-    data = np.concatenate((gyro_data, mast_data), axis=0)
-    data = data[-CHART_DATAPOINTS:]
-    data[:,1][data[:,1]>ECHO_THRESHOLD] = ECHO_THRESHOLD
-    axes[0,0].clear()
-    axes[0,1].clear()
-    axes[1,0].clear()
-    axes[1,1].clear()
-    axes[2,0].clear()
-    axes[0,0].plot(data[:,0], data[:,1], marker='', linestyle='solid', linewidth=1)
-    axes[0,1].plot(data[:,0], data[:,2], marker='', linestyle='solid', linewidth=1)
-    axes[1,0].plot(data[:,0], data[:,3], marker='', linestyle='solid', linewidth=1)
-    axes[1,1].plot(data[:,0], data[:,4], marker='', linestyle='solid', linewidth=1)
-    axes[2,0].plot(data[:,0], data[:,5], marker='', linestyle='solid', linewidth=1)
+    if gyro_data.size != 0:
+        gyro_data[:,1][gyro_data[:,1]>ECHO_THRESHOLD] = ECHO_THRESHOLD
+        axes[0,0].clear()
+        axes[0,1].clear()
+        axes[0,0].plot(gyro_data[:,0], gyro_data[:,1], marker='', linestyle='solid', linewidth=1)
+        axes[0,1].plot(gyro_data[:,0], gyro_data[:,2], marker='', linestyle='solid', linewidth=1)
+    if mast_data.size != 0:
+        axes[1,0].clear()
+        axes[1,1].clear()
+        axes[2,0].clear()
+        axes[1,0].plot(mast_data[:,0], mast_data[:,0], marker='', linestyle='solid', linewidth=1)
+        axes[1,1].plot(mast_data[:,0], mast_data[:,1], marker='', linestyle='solid', linewidth=1)
+        axes[2,0].plot(mast_data[:,0], mast_data[:,2], marker='', linestyle='solid', linewidth=1)
 
 ani = animation.FuncAnimation(fig, animate, interval=100)
 
@@ -109,7 +117,8 @@ def parse_mast(raw):
     line_split = raw.split(b",")
     data = [time.time(),
         int(line_split[3]),
-        int(line_split[4])]
+        int(line_split[4]),
+        float(sqrt(2*line_split[1]/1.225) * 3,6)]
     return data
     
 def parse_gyro(raw):
@@ -124,7 +133,7 @@ def parse_gyro(raw):
 def stop(*args):
     global STATUS
     
-    logging.warning("STOP Signal recieved")
+    logging.warning("User STOP Signal recieved")
     STATUS = "STOP"
     gyro_thread.join()
     mast_thread.join()
@@ -132,7 +141,7 @@ def stop(*args):
     mast_file.close()
     sys.exit(0)
 
-logging.info("Programm start")
+logging.info("Programm started")
 
 signal.signal(signal.SIGINT, stop)
 gyro_thread = threading.Thread(target=read_serial, args=(GYRO_PORT, GYRO_RATE, parse_gyro))
