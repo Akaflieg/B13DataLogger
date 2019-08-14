@@ -14,12 +14,15 @@ from datetime import datetime
 data = []
 
 # PORT LINKS
-COM_PORT = "COM5"
-COM_RATE = 57600
+GYRO_PORT = "COM5"
+GYRO_RATE = 57600
+MAST_PORT = "COM4"
+MAST_RATE = 57600
 STATUS = "RUN"
 DATA_DIR = "./data"
 
 DATA_GYRO_ECHO = []
+DATA_MAST = []
 
 #plt.show()
 
@@ -27,7 +30,8 @@ DATA_GYRO_ECHO = []
 datestr = datetime.now().strftime("%Y-%m-%d %H-%M-%S")
 
 os.chdir(DATA_DIR)
-data_file = open(datestr + ".txt", "w+")
+gyro_file = open(datestr + "-gyro.txt", "w+")
+mast_file = open(datestr + "-mast.txt", "w+")
 
 logger = logging.getLogger()
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -38,16 +42,44 @@ logger.addHandler(ch)
 
 
 fig = plt.figure()
-ax = fig.add_subplot(1,1,1)
+axes = fig.subplots(3, 2)
 
 
 def animate(_):
-    global df
-    ax.clear()
-    data = np.array(DATA_GYRO_ECHO)
-    print(DATA_GYRO_ECHO)
-    ax.plot(data[:,0], data[:,1], marker='', linestyle='solid', linewidth=1)
+    global DATA_GYRO_ECHO
     
+    T = 1000
+    PAST = 500
+    
+    print("plotting")
+    
+    # axes.clear()
+    gyro_data = np.array(DATA_GYRO_ECHO)
+    mast_data = np.array(DATA_MAST)
+    if gyro_data.size == 0 and mast_data.size != 0:
+        data = np.hstack((mast_data[:, [0]], np.zeros((mast_data.shape[0], 3)), mast_data[:,1:]))
+    elif gyro_data.size != 0 and mast_data.size == 0:
+        data = np.hstack((gyro_data, np.zeros((gyro_data.shape[0], 2))))
+    else:
+        return
+        
+    #   gyro_data = np.hstack((gyro_data, np.zeros((gyro_data.shape[0], 2))))
+    # mast_data = np.c_[mast_data[:, 0], np.zeros((gyro_data.shape[0], 3)), mast_data[:,0:]]
+    # data = np.conatinate((gyro_data, mast_data), axis=0)
+    data = data[-PAST:]
+    print(data)
+    data[:,1][data[:,1]>T] = T
+    axes[0,0].clear()
+    axes[0,1].clear()
+    axes[1,0].clear()
+    axes[1,1].clear()
+    axes[2,0].clear()
+    axes[0,0].plot(data[:,0], data[:,1], marker='', linestyle='solid', linewidth=1)
+    axes[0,1].plot(data[:,0], data[:,2], marker='', linestyle='solid', linewidth=1)
+    axes[1,0].plot(data[:,0], data[:,3], marker='', linestyle='solid', linewidth=1)
+    axes[1,1].plot(data[:,0], data[:,4], marker='', linestyle='solid', linewidth=1)
+    axes[2,0].plot(data[:,0], data[:,5], marker='', linestyle='solid', linewidth=1)
+
 ani = animation.FuncAnimation(fig, animate, interval=100)
 
 def read_gyro_echo(port, rate):
@@ -55,49 +87,80 @@ def read_gyro_echo(port, rate):
     
     logging.info(f"Opening connection on {port} with rate {rate}")
     
-    with serial.Serial(port, rate, timeout=1) as ser:
-        logging.info("Commenication established")
-        while ser.is_open and STATUS == "RUN":
-            line = ser.readline()
-            line = line.strip(b"\r\n")
-            try:
-                print(line)
+    while STATUS == "RUN":
+        try:
+            ser = serial.Serial(port, rate, timeout=1)
+            logging.info(f"Serial connection {port} established")
+            while STATUS == "RUN":
+                line = ser.readline()
+                line = line.strip(b"\r\n")
                 if line.startswith(b"I2C"):
                     logging.error("I2C Warning")
-                    continue                    
+                    continue
                 try:
                     line_split = line.split(b",")
-                    '''data = {"timestamp": time.time(),
-                                    "dis": int(line_split[0]),
-                                    "gyro": float(line_split[1]),
-                                    "accel": float(line_split[2])}'''
                     data = [time.time(),
                         int(line_split[0]),
                         float(line_split[1]),
                         float(line_split[2])]
-                    print(DATA_GYRO_ECHO)
-                    DATA_GYRO_ECHO.append(DATA_GYRO_ECHO)
-                    data_file.write(",".join(map(str, data.values())) + "\n")
+                    DATA_GYRO_ECHO.append(data)
+                    gyro_file.write(",".join(map(str, data)) + "\n")
                 except (ValueError, IndexError) as e:
                     print(e)
-            except SerialException:
-                logging.error("Serial connection failed!")
-                time.sleep(1)
-        
+        except SerialException:
+            logging.error(f"Serial connection {port} failed!")
+            time.sleep(1)
+    ser.close()
+                
+def read_mast(port, rate):
+    '''
+        Mast data collection
+    '''
+    global df, STATUS, DATA_MAST
+    
+    logging.info(f"Opening connection on {port} with rate {rate}")
+    
+    while STATUS == "RUN":
+        try:
+            ser = serial.Serial(port, rate, timeout=1)
+            logging.info("Commenication established")
+            while STATUS == "RUN":
+                line = ser.readline()
+                line = line.strip(b"\r\n")
+                if line.startswith(b"I2C"):
+                    logging.error("I2C Warning")
+                    continue
+                try:
+                    line_split = line.split(b",")
+                    data = [time.time(),
+                        int(line_split[3]),
+                        int(line_split[4])]
+                    DATA_MAST.append(data)
+                    mast_file.write(",".join(map(str, data)) + "\n")
+                except (ValueError, IndexError) as e:
+                    print(e)
+        except SerialException:
+            logging.error("Serial connection failed!")
+            time.sleep(1)
+    ser.close()
 
 def stop(*args):
     global STATUS
     
     logging.warning("STOP Signal recieved")
     STATUS = "STOP"
-    thread.join()
+    # gyro_thread.join()
+    mast_thread.join()
+    gyro_file.close()
+    mast_file.close()
     sys.exit(0)
 
 logging.info("Programm start")
 
 signal.signal(signal.SIGINT, stop)
-thread = threading.Thread(target=read_gyro_echo, args=(COM_PORT, COM_RATE))
-thread.start()
+gyro_thread = threading.Thread(target=read_gyro_echo, args=(GYRO_PORT, GYRO_RATE))
+mast_thread = threading.Thread(target=read_mast, args=(MAST_PORT, MAST_RATE))
+# gyro_thread.start()
+mast_thread.start()
 plt.show()
 stop()
-f.close()
