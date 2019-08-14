@@ -11,9 +11,9 @@ import matplotlib.animation as animation
 from datetime import datetime
 
 # CONFIG
-GYRO_PORT = "COM5"
+GYRO_PORT = "COM"
 GYRO_RATE = 57600
-MAST_PORT = "COM4"
+MAST_PORT = "COM7"
 MAST_RATE = 57600
 DATA_DIR = "./data"
 
@@ -21,14 +21,16 @@ ECHO_THRESHOLD = 1000
 CHART_DATAPOINTS = 500
 
 STATUS = "RUN"
-DATA_GYRO_ECHO = []
-DATA_MAST = []
 
 timestamp = datetime.now().strftime("%Y-%m-%d %H-%M-%S")
 
 os.chdir(DATA_DIR)
 gyro_file = open(timestamp + "-gyro.txt", "w+")
 mast_file = open(timestamp + "-mast.txt", "w+")
+
+# 0-Gyro 1-Mast
+DATA = {GYRO_PORT: [], MAST_PORT: []}
+FILES = {GYRO_PORT: gyro_file, MAST_PORT: mast_file}
 
 logger = logging.getLogger()
 formatter = logging.Formatter('%(asctime)s - %(levelname)s: %(message)s')
@@ -43,20 +45,20 @@ fig = plt.figure()
 axes = fig.subplots(3, 2)
 
 def animate(_):
-    global DATA_GYRO_ECHO
+    global DATA
     
     # axes.clear()
-    gyro_data = np.array(DATA_GYRO_ECHO)
-    mast_data = np.array(DATA_MAST)
+    gyro_data = np.array(DATA[GYRO_PORT])
+    mast_data = np.array(DATA[MAST_PORT])
     if gyro_data.size == 0:
         gyro_data = np.empty((1,4))
     if mast_data.size == 0:
         mast_data = np.empty((1,3))
      
     # Pad data for concatination
-    mast_data = np.hstack((mast_data[:, [0]], np.zeros((mast_data.shape[0], 3)), mast_data[:,1:]))
     gyro_data = np.hstack((gyro_data, np.zeros((gyro_data.shape[0], 2))))
-
+    mast_data = np.hstack((mast_data[:, [0]], np.zeros((mast_data.shape[0], 3)), mast_data[:,1:]))
+    
     data = np.concatenate((gyro_data, mast_data), axis=0)
     data = data[-CHART_DATAPOINTS:]
     data[:,1][data[:,1]>ECHO_THRESHOLD] = ECHO_THRESHOLD
@@ -74,7 +76,7 @@ def animate(_):
 ani = animation.FuncAnimation(fig, animate, interval=100)
 
 def read_serial(port, rate, parse_func):
-    global df, STATUS, DATA_GYRO_ECHO
+    global df, STATUS, DATA
     
     logging.info(f"Opening connection on {port} with rate {rate}")
     
@@ -92,8 +94,8 @@ def read_serial(port, rate, parse_func):
                     continue
                 try:
                     data = parse_func(line)
-                    DATA_GYRO_ECHO.append(data)
-                    gyro_file.write(",".join(map(str, data)) + "\n")
+                    DATA[port].append(data)
+                    FILES[port].write(",".join(map(str, data)) + "\n")
                 except (ValueError, IndexError) as e:
                     logging.warning(f"Invalid value recieved on {port}: {line}")
         except serial.SerialException:
@@ -103,6 +105,7 @@ def read_serial(port, rate, parse_func):
         serial_connection.close()
                
 def parse_mast(raw):
+    print(raw)
     line_split = raw.split(b",")
     data = [time.time(),
         int(line_split[3]),

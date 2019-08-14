@@ -1,2 +1,1 @@
-activate root
-python analysis.py
+python .\analysis.py
