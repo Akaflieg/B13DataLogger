@@ -56,16 +56,18 @@ def animate(_):
     # axes.clear()
     gyro_data = np.array(DATA_GYRO_ECHO)
     mast_data = np.array(DATA_MAST)
-    if gyro_data.size == 0 and mast_data.size != 0:
-        data = np.hstack((mast_data[:, [0]], np.zeros((mast_data.shape[0], 3)), mast_data[:,1:]))
-    elif gyro_data.size != 0 and mast_data.size == 0:
-        data = np.hstack((gyro_data, np.zeros((gyro_data.shape[0], 2))))
-    else:
-        return
-        
-    #   gyro_data = np.hstack((gyro_data, np.zeros((gyro_data.shape[0], 2))))
-    # mast_data = np.c_[mast_data[:, 0], np.zeros((gyro_data.shape[0], 3)), mast_data[:,0:]]
-    # data = np.conatinate((gyro_data, mast_data), axis=0)
+    print(mast_data)
+    if gyro_data.size == 0:
+        gyro_data = np.empty((1,4))
+    if mast_data.size == 0:
+        mast_data = np.empty((1,3))
+     
+    mast_data = np.hstack((mast_data[:, [0]], np.zeros((mast_data.shape[0], 3)), mast_data[:,1:]))
+    gyro_data = np.hstack((gyro_data, np.zeros((gyro_data.shape[0], 2))))
+
+    print(gyro_data)
+    print(mast_data)    
+    data = np.concatenate((gyro_data, mast_data), axis=0)
     data = data[-PAST:]
     print(data)
     data[:,1][data[:,1]>T] = T
@@ -149,7 +151,7 @@ def stop(*args):
     
     logging.warning("STOP Signal recieved")
     STATUS = "STOP"
-    # gyro_thread.join()
+    gyro_thread.join()
     mast_thread.join()
     gyro_file.close()
     mast_file.close()
@@ -160,7 +162,7 @@ logging.info("Programm start")
 signal.signal(signal.SIGINT, stop)
 gyro_thread = threading.Thread(target=read_gyro_echo, args=(GYRO_PORT, GYRO_RATE))
 mast_thread = threading.Thread(target=read_mast, args=(MAST_PORT, MAST_RATE))
-# gyro_thread.start()
+gyro_thread.start()
 mast_thread.start()
 plt.show()
 stop()
