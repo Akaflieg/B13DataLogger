@@ -9,11 +9,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from datetime import datetime
+from math import sqrt
 
 # CONFIG
-GYRO_PORT = "COM5"
+GYRO_PORT = "/dev/ttyUSB0"
 GYRO_RATE = 57600
-MAST_PORT = "COM7"
+MAST_PORT = "/dev/ttyUSB1"
 MAST_RATE = 57600
 DATA_DIR = "./data"
 
@@ -118,7 +119,7 @@ def parse_mast(raw):
     data = [time.time(),
         int(line_split[3]),
         int(line_split[4]),
-        float(sqrt(2*line_split[1]/1.225) * 3,6)]
+        float(sqrt(2*float(line_split[1])/1.225) * 3.6)]
     return data
     
 def parse_gyro(raw):
