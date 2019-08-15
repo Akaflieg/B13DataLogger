@@ -15,7 +15,7 @@ from datetime import datetime
 config = configparser.ConfigParser()
 config.read("config.ini")
     
-conf = config["DEFAULT"]
+conf = config["CONNECTION"]
 
 GYRO_PORT = conf.get("GYRO_PORT", "COM5")
 GYRO_RATE = conf.get("GYRO_RATE", 57600)
@@ -69,9 +69,9 @@ def animate(_):
     axes[2,1].clear()
     
     if CONNECTION_STATUS[GYRO_PORT] is False:
-        axes[0,0].text(0.5, 0.5,'Connection failed', horizontalalignment='center', verticalalignment='center', transform = axes[0,0].transAxes)
-        axes[0,1].text(0.5, 0.5,'Connection failed', horizontalalignment='center', verticalalignment='center', transform = axes[0,1].transAxes)
-        axes[1,0].text(0.5, 0.5,'Connection failed', horizontalalignment='center', verticalalignment='center', transform = axes[1,0].transAxes)
+        axes[0,0].text(0.5, 0.5,'Gyro connection failed', horizontalalignment='center', verticalalignment='center', transform = axes[0,0].transAxes)
+        axes[0,1].text(0.5, 0.5,'Gyro connection failed', horizontalalignment='center', verticalalignment='center', transform = axes[0,1].transAxes)
+        axes[1,0].text(0.5, 0.5,'Gyro connection failed', horizontalalignment='center', verticalalignment='center', transform = axes[1,0].transAxes)
     elif gyro_data.size != 0:
         gyro_data[:,0] = gyro_data[:,0] - time.time()
         gyro_data[:,1][gyro_data[:,1]>ECHO_THRESHOLD] = ECHO_THRESHOLD
@@ -80,9 +80,9 @@ def animate(_):
         axes[1,0].plot(gyro_data[:,0], gyro_data[:,3], marker='', linestyle='solid', linewidth=1)   
         
     if CONNECTION_STATUS[MAST_PORT] is False:
-        axes[1,1].text(0.5, 0.5,'Connection failed', horizontalalignment='center', verticalalignment='center', transform = axes[1,1].transAxes)
-        axes[2,0].text(0.5, 0.5,'Connection failed', horizontalalignment='center', verticalalignment='center', transform = axes[2,0].transAxes)
-        axes[2,1].text(0.5, 0.5,'Connection failed', horizontalalignment='center', verticalalignment='center', transform = axes[2,1].transAxes)
+        axes[1,1].text(0.5, 0.5,'Mast connection failed', horizontalalignment='center', verticalalignment='center', transform = axes[1,1].transAxes)
+        axes[2,0].text(0.5, 0.5,'Mast connection failed', horizontalalignment='center', verticalalignment='center', transform = axes[2,0].transAxes)
+        axes[2,1].text(0.5, 0.5,'Mast connection failed', horizontalalignment='center', verticalalignment='center', transform = axes[2,1].transAxes)
     elif mast_data.size != 0:
         mast_data[:,0] = mast_data[:,0] - time.time()
         mast_data[:,1] = -0.23 * mast_data[:,1] + 140.6
