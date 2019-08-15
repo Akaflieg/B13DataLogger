@@ -12,9 +12,9 @@ import matplotlib.animation as animation
 from datetime import datetime
 
 # CONFIG
-GYRO_PORT = "COM5"
+GYRO_PORT = "/dev/ttyUSB0"
 GYRO_RATE = 57600
-MAST_PORT = "COM4"
+MAST_PORT = "/dev/ttyUSB1"
 MAST_RATE = 57600
 DATA_DIR = "./data"
 
@@ -157,7 +157,3 @@ gyro_thread.start()
 mast_thread.start()
 plt.show()
 stop()
-
-# TODO
-# - PyQT wrapper?
-# - Markers
