@@ -12,9 +12,9 @@ import matplotlib.animation as animation
 from datetime import datetime
 
 # CONFIG
-GYRO_PORT = "/dev/ttyUSB0"
+GYRO_PORT = "COM5"
 GYRO_RATE = 57600
-MAST_PORT = "/dev/ttyUSB1"
+MAST_PORT = "COM4"
 MAST_RATE = 57600
 DATA_DIR = "./data"
 
@@ -56,19 +56,19 @@ def animate(_):
     mast_data = mast_data[-CHART_DATAPOINTS:]
     
     if gyro_data.size != 0:
+        gyro_data[:,0] = gyro_data[:,0] - time.time()
         gyro_data[:,1][gyro_data[:,1]>ECHO_THRESHOLD] = ECHO_THRESHOLD
         axes[0,0].clear()
         axes[0,1].clear()
         axes[1,0].clear()
         axes[0,0].plot(gyro_data[:,0], gyro_data[:,1], marker='', linestyle='solid', linewidth=1)
         axes[0,1].plot(gyro_data[:,0], gyro_data[:,2], marker='', linestyle='solid', linewidth=1)
-        axes[1,0].plot(gyro_data[:,0], gyro_data[:,2], marker='', linestyle='solid', linewidth=1)
+        axes[1,0].plot(gyro_data[:,0], gyro_data[:,3], marker='', linestyle='solid', linewidth=1)
     if mast_data.size != 0:
-        axes[1,0].clear()
+        mast_data[:,0] = mast_data[:,0] - time.time()
         axes[1,1].clear()
         axes[2,0].clear()
         axes[2,1].clear()
-        # axes[1,0].plot(mast_data[:,0], mast_data[:,0], marker='', linestyle='solid', linewidth=1)
         axes[1,1].plot(mast_data[:,0], mast_data[:,1], marker='', linestyle='solid', linewidth=1)
         axes[2,0].plot(mast_data[:,0], mast_data[:,2], marker='', linestyle='solid', linewidth=1)
         axes[2,1].plot(mast_data[:,0], mast_data[:,3], marker='', linestyle='solid', linewidth=1)
@@ -85,9 +85,9 @@ def animate(_):
     axes[1,0].set_ylim(-20, 20)
     axes[1,1].set_ylim(0, 1024)
     axes[2,0].set_ylim(0, 1024)
-    axes[2,1].set_ylim(0, 100)
+    axes[2,1].set_ylim(0, 250)
 
-ani = animation.FuncAnimation(fig, animate, interval=50)
+ani = animation.FuncAnimation(fig, animate, interval=500)
 
 def read_serial(port, rate, parse_func):
     global STATUS, DATA
@@ -121,8 +121,8 @@ def read_serial(port, rate, parse_func):
 def parse_mast(raw):
     line_split = raw.split(b",")
     data = [time.time(),
-        int(line_split[3]),
         int(line_split[4]),
+        int(line_split[3]),
         float(math.sqrt(2*float(line_split[1])/1.225) * 3.6)]
     return data
     
@@ -132,8 +132,6 @@ def parse_gyro(raw):
         int(line_split[0]),
         float(line_split[1]),
         float(line_split[2])]
-        
-    print(data[3])
         
     return data
 
