@@ -1,7 +1,6 @@
 import os
 import sys
 import time
-import math
 import serial
 import signal
 import logging
@@ -173,5 +172,5 @@ mast_thread = threading.Thread(target=read_serial, args=(MAST_PORT, MAST_RATE, p
 gyro_thread.start()
 mast_thread.start()
 plt.show(block=False)
-input("Enter to exit")
+input()
 stop()
