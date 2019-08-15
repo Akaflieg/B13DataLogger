@@ -7,21 +7,27 @@ import signal
 import logging
 import threading
 import numpy as np
+import configparser
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from datetime import datetime
 
-# CONFIG
-GYRO_PORT = "COM5"
-GYRO_RATE = 57600
-MAST_PORT = "COM4"
-MAST_RATE = 57600
-DATA_DIR = "./data"
+config = configparser.ConfigParser()
+config.read("config.ini")
+    
+conf = config["DEFAULT"]
+
+GYRO_PORT = conf.get("GYRO_PORT", "COM5")
+GYRO_RATE = conf.get("GYRO_RATE", 57600)
+MAST_PORT = conf.get("MAST_PORT", "COM4")
+MAST_RATE = conf.get("MAST_RATE", 57600)
+DATA_DIR = conf.get("DATA_DIR", "./data")
 
 ECHO_THRESHOLD = 1000  # TODO Remove?
 CHART_DATAPOINTS = 500
 
 STATUS = "RUN"
+CONNECTION_STATUS = {GYRO_PORT: False, MAST_PORT: False}
 
 timestamp = datetime.now().strftime("%Y-%m-%d %H-%M-%S")
 
@@ -55,35 +61,46 @@ def animate(_):
     gyro_data = gyro_data[-CHART_DATAPOINTS:]
     mast_data = mast_data[-CHART_DATAPOINTS:]
     
-    if gyro_data.size != 0:
+    axes[0,0].clear()
+    axes[0,1].clear()
+    axes[1,0].clear()
+    axes[1,1].clear()
+    axes[2,0].clear()
+    axes[2,1].clear()
+    
+    if CONNECTION_STATUS[GYRO_PORT] is False:
+        axes[0,0].text(0.5, 0.5,'Connection failed', horizontalalignment='center', verticalalignment='center', transform = axes[0,0].transAxes)
+        axes[0,1].text(0.5, 0.5,'Connection failed', horizontalalignment='center', verticalalignment='center', transform = axes[0,1].transAxes)
+        axes[1,0].text(0.5, 0.5,'Connection failed', horizontalalignment='center', verticalalignment='center', transform = axes[1,0].transAxes)
+    elif gyro_data.size != 0:
         gyro_data[:,0] = gyro_data[:,0] - time.time()
         gyro_data[:,1][gyro_data[:,1]>ECHO_THRESHOLD] = ECHO_THRESHOLD
-        axes[0,0].clear()
-        axes[0,1].clear()
-        axes[1,0].clear()
         axes[0,0].plot(gyro_data[:,0], gyro_data[:,1], marker='', linestyle='solid', linewidth=1)
         axes[0,1].plot(gyro_data[:,0], gyro_data[:,2], marker='', linestyle='solid', linewidth=1)
-        axes[1,0].plot(gyro_data[:,0], gyro_data[:,3], marker='', linestyle='solid', linewidth=1)
-    if mast_data.size != 0:
+        axes[1,0].plot(gyro_data[:,0], gyro_data[:,3], marker='', linestyle='solid', linewidth=1)   
+        
+    if CONNECTION_STATUS[MAST_PORT] is False:
+        axes[1,1].text(0.5, 0.5,'Connection failed', horizontalalignment='center', verticalalignment='center', transform = axes[1,1].transAxes)
+        axes[2,0].text(0.5, 0.5,'Connection failed', horizontalalignment='center', verticalalignment='center', transform = axes[2,0].transAxes)
+        axes[2,1].text(0.5, 0.5,'Connection failed', horizontalalignment='center', verticalalignment='center', transform = axes[2,1].transAxes)
+    elif mast_data.size != 0:
         mast_data[:,0] = mast_data[:,0] - time.time()
-        axes[1,1].clear()
-        axes[2,0].clear()
-        axes[2,1].clear()
+        mast_data[:,1] = -0.23 * mast_data[:,1] + 140.6
+        mast_data[:,3] = np.sqrt(2 * mast_data[:,3] / 1.225) * 3.6
         axes[1,1].plot(mast_data[:,0], mast_data[:,1], marker='', linestyle='solid', linewidth=1)
         axes[2,0].plot(mast_data[:,0], mast_data[:,2], marker='', linestyle='solid', linewidth=1)
-        axes[2,1].plot(mast_data[:,0], mast_data[:,3], marker='', linestyle='solid', linewidth=1)
-        
+        axes[2,1].plot(mast_data[:,0], mast_data[:,3], marker='', linestyle='solid', linewidth=1)    
     
     axes[0,0].title.set_text("Elevator raw")
     axes[0,1].title.set_text("Load factor (g)")
     axes[1,0].title.set_text("Pitch rate (deg/s)")
-    axes[1,1].title.set_text("Alpha raw")
+    axes[1,1].title.set_text("Alpha (deg)")
     axes[2,0].title.set_text("Beta raw")
     axes[2,1].title.set_text("IAS (km/h)")
     axes[0,0].set_ylim(30, 80)
     axes[0,1].set_ylim(-2, 1)
     axes[1,0].set_ylim(-20, 20)
-    axes[1,1].set_ylim(0, 1024)
+    axes[1,1].set_ylim(-20, 20)
     axes[2,0].set_ylim(0, 1024)
     axes[2,1].set_ylim(0, 250)
 
@@ -108,11 +125,13 @@ def read_serial(port, rate, parse_func):
                     continue
                 try:
                     data = parse_func(line)
-                    DATA[port].append(data)
                     FILES[port].write(",".join(map(str, data)) + "\n")
+                    DATA[port].append(data)
                 except (ValueError, IndexError) as e:
                     logging.warning(f"Invalid value recieved on {port}: {line}")
+                CONNECTION_STATUS[port] = True
         except serial.SerialException:
+            CONNECTION_STATUS[port] = False
             logging.error(f"Serial connection {port} failed!")
             time.sleep(1)
     if serial_connection:
@@ -121,9 +140,9 @@ def read_serial(port, rate, parse_func):
 def parse_mast(raw):
     line_split = raw.split(b",")
     data = [time.time(),
-        int(line_split[4]),
+        float(line_split[4]),
         int(line_split[3]),
-        float(math.sqrt(2*float(line_split[1])/1.225) * 3.6)]
+        float(line_split[1])]
     return data
     
 def parse_gyro(raw):
@@ -153,5 +172,6 @@ gyro_thread = threading.Thread(target=read_serial, args=(GYRO_PORT, GYRO_RATE, p
 mast_thread = threading.Thread(target=read_serial, args=(MAST_PORT, MAST_RATE, parse_mast))
 gyro_thread.start()
 mast_thread.start()
-plt.show()
+plt.show(block=False)
+input("Enter to exit")
 stop()

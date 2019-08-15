@@ -1,0 +1,7 @@
+[DEFAULT]
+gyro_port = COM4
+gyro_rate = 57600
+mast_port = COM4
+mast_rate = 57600
+DATA_DIR = ./data
+
