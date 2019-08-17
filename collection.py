@@ -31,8 +31,10 @@ CONNECTION_STATUS = {GYRO_PORT: False, MAST_PORT: False}
 timestamp = datetime.now().strftime("%Y-%m-%d %H-%M-%S")
 
 os.chdir(DATA_DIR)
-gyro_file = open(timestamp + "-gyro.txt", "w+")
-mast_file = open(timestamp + "-mast.txt", "w+")
+gyro_file = open(timestamp + "-gyro.csv", "w+")
+gyro_file.write("timestamp,elevator,load_factor,pitch_rate\n")
+mast_file = open(timestamp + "-mast.csv", "w+")
+mast_file.write("timestamp,alpha,beta,ias\n")
 
 DATA = {GYRO_PORT: [], MAST_PORT: []}
 FILES = {GYRO_PORT: gyro_file, MAST_PORT: mast_file}
