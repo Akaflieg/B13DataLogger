@@ -4,16 +4,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import math
 from pandas.tseries.offsets import DateOffset
-# import scipy.signal
 
-'''data_dir = Path("./data")
-files = [file for file in data_dir.iterdir() if file.is_file()]
-runs = set([filename.name[:19] for filename in files])
-print(runs)
-
-print("Select run")
-for run in list(runs)[-10:]:
-    print(run)  '''
     
 timestamp = "2019-08-16 17-09-28"
 
@@ -26,11 +17,11 @@ def normalise_datetime(raw):
     return df
     
 def calc_datarate(df):
-    rate = df[["timestamp"]].diff()
-    return 1 / rate
+    rate = df.index.to_series().diff()
+    return rate
     
 def resample(df, freq=20):
-    return df.resample("50ms", base=0).mean().dropna()
+    return df.resample("50ms", base=0).ffill().dropna()
     
 
 gyro_raw = pd.read_csv(f"./data/{timestamp}-gyro.csv")
@@ -41,40 +32,21 @@ mast_raw = pd.read_csv(f"./data/{timestamp}-mast.csv")
 mast = normalise_datetime(mast_raw)
 mast = resample(mast)
     
-combined = mast.merge(gyro, sort=True, left_index=True, right_index=True)
-
+combined = mast.merge(gyro, how="inner", sort=True, left_index=True, right_index=True)
+# combined = combined.dropna()
 print(combined)
 
-gyro_rate = calc_datarate(gyro)
-mast_rate = calc_datarate(mast)
-#mast_rel = mast.copy()
+data_rate = calc_datarate(combined)
 #mast_rel["time"] = mast[["timestamp"]] - mast[["timestamp"]].iloc[0]
-#mast_rel.set_index("time", inplace=True)
-#gload = mast_raw[["accel", "elevator"]]
-#gload["time"] = mast_raw[["timestamp"]] - mast_raw[["timestamp"]].iloc[0]
-#gload.set_index("time", inplace=True)
 
-
-
-# mast = mast_rel.asfreq(freq="10S")
-# idx = pd.date_range(mast.first_valid_index(), mast.last_valid_index(), freq='50ms')
-# idx = mast.asfreq('50ms').index
-# idx = idx.floor('50ms')
-
-
-
-#y = mast.reindex(mast.index.union(idx)).interpolate('index').reindex(idx)
-#y = y.dropna()
-#mast_it = mast.resample("1s").interpolate("linear")
-#y[["elevator"]].plot()
-#mast[["elevator"]].plot()
-# mast = mast_raw.resample(DateOffset(milliseconds=round(1/FREQ)))
 
 ax1 = combined[["alpha"]].plot(linewidth=1)
 ax2 = ax1.twinx()
 ax2.spines['right'].set_position(('axes', 1.0))
 combined[["elevator"]].plot(ax=ax2, color="red", linewidth=1)
 print(mast)
-# data_rate.plot()
-# mast[["ias"]].plot()
-plt.show()
+print(gyro)
+data_rate.plot()
+mast[["alpha"]].plot()
+# plt.show()
+combined.to_csv(f"{timestamp}-combined.csv")
