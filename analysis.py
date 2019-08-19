@@ -4,11 +4,18 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import math
 from pandas.tseries.offsets import DateOffset
+import argparse
 
-    
-timestamp = "2019-08-16 17-09-28"
+parser = argparse.ArgumentParser(description="Combine 'gyro' and 'mast' logfiles into one while resampling the frequency.")
+parser.add_argument('in', metavar='INPUT', nargs=1,
+                    help='Timestamp of the input files')
+parser.add_argument('--freq', metavar='FREQ', nargs='?', type=int, default=20,
+                    help='Output frequency (in Hz) for resampled data')
+args = parser.parse_args()
 
-FREQ = 20
+timestamp = vars(args)["in"][0]
+freq = vars(args)["freq"]
+
 
 def normalise_datetime(raw):
     df = raw.copy()
@@ -21,16 +28,17 @@ def calc_datarate(df):
     return rate
     
 def resample(df, freq=20):
-    return df.resample("50ms", base=0).ffill().dropna()
+    milliseconds = int(1000 / freq)
+    return df.resample(str(milliseconds) + "ms", base=0).ffill().dropna()
     
 
-gyro_raw = pd.read_csv(f"./data/{timestamp}-gyro.csv")
+gyro_raw = pd.read_csv(f"./data/{timestamp}-gyro.txt")
 gyro = normalise_datetime(gyro_raw)
-gyro = resample(gyro)
+gyro = resample(gyro, freq)
 
-mast_raw = pd.read_csv(f"./data/{timestamp}-mast.csv")
+mast_raw = pd.read_csv(f"./data/{timestamp}-mast.txt")
 mast = normalise_datetime(mast_raw)
-mast = resample(mast)
+mast = resample(mast, freq)
     
 combined = mast.merge(gyro, how="inner", sort=True, left_index=True, right_index=True)
 # combined = combined.dropna()
